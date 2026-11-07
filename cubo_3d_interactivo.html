@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cubo 3D Interactivo - Three.js</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background-color: #0b0f19;
+            color: #f3f4f6;
+            user-select: none;
+        }
+
+        #webgl-container {
+            width: 100vw;
+            height: 100vh;
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 1;
+        }
+
+        /* Estilos personalizados para dat.gui / lil-gui */
+        .lil-gui {
+            --background-color: rgba(17, 24, 39, 0.85) !important;
+            --text-color: #e5e7eb !important;
+            --title-background-color: rgba(31, 41, 55, 0.9) !important;
+            --widget-color: #374151 !important;
+            --hover-color: #4b5563 !important;
+            --focus-color: #6366f1 !important;
+            --number-color: #818cf8 !important;
+            --string-color: #34d399 !important;
+            font-family: 'Inter', sans-serif !important;
+            border-radius: 12px !important;
+            overflow: hidden !important;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5), 0 8px 10px -6px rgba(0, 0, 0, 0.3) !important;
+            backdrop-filter: blur(12px) !important;
+            border: 1px solid rgba(255, 255, 255, 0.1) !important;
+        }
+        
+        .lil-gui .title {
+            font-weight: 600 !important;
+            letter-spacing: 0.025em !important;
+            padding: 10px 14px !important;
+        }
+
+        /* Indicador de ayuda */
+        .glass-panel {
+            background: rgba(17, 24, 39, 0.65);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+    </style>
+</head>
+<body class="bg-gray-950 text-gray-100 min-h-screen overflow-hidden">
+
+    <!-- Canvas para Three.js -->
+    <div id="webgl-container"></div>
+
+    <!-- UI Overlay (Encabezado y Controles) -->
+    <div class="relative z-10 pointer-events-none flex flex-col justify-between min-h-screen p-4 sm:p-6">
+        
+        <!-- Header -->
+        <header class="flex justify-between items-center w-full max-w-7xl mx-auto">
+            <div class="glass-panel px-4 py-3 rounded-2xl flex items-center space-x-3 pointer-events-auto shadow-lg">
+                <div class="w-9 h-9 rounded-xl bg-indigo-600/80 flex items-center justify-center text-white shadow-md shadow-indigo-500/30">
+                    <i class="fa-solid fa-cube text-lg"></i>
+                </div>
+                <div>
+                    <h1 class="text-base sm:text-lg font-bold tracking-tight bg-gradient-to-r from-white via-gray-200 to-indigo-300 bg-clip-text text-transparent">
+                        Cubo 3D Interactivo
+                    </h1>
+                    <p class="text-xs text-gray-400">Three.js + Lighting & OrbitControls</p>
+                </div>
+            </div>
+
+            <!-- Botón de presets de color rápido -->
+            <div class="glass-panel p-2 rounded-2xl pointer-events-auto hidden md:flex items-center space-x-2">
+                <button onclick="applyPreset('cyberpunk')" class="px-3 py-1.5 text-xs font-medium rounded-xl bg-pink-500/20 text-pink-300 hover:bg-pink-500/30 border border-pink-500/30 transition-all">
+                    Cyberpunk
+                </button>
+                <button onclick="applyPreset('emerald')" class="px-3 py-1.5 text-xs font-medium rounded-xl bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/30 border border-emerald-500/30 transition-all">
+                    Esmeralda
+                </button>
+                <button onclick="applyPreset('gold')" class="px-3 py-1.5 text-xs font-medium rounded-xl bg-amber-500/20 text-amber-300 hover:bg-amber-500/30 border border-amber-500/30 transition-all">
+                    Oro
+                </button>
+                <button onclick="applyPreset('default')" class="px-3 py-1.5 text-xs font-medium rounded-xl bg-indigo-500/20 text-indigo-300 hover:bg-indigo-500/30 border border-indigo-500/30 transition-all">
+                    Neón Azul
+                </button>
+            </div>
+        </header>
+
+        <!-- Footer / Guía de Interacción -->
+        <footer class="w-full max-w-7xl mx-auto flex flex-col sm:flex-row justify-between items-end sm:items-center gap-4">
+            <div class="glass-panel px-4 py-3 rounded-2xl text-xs text-gray-300 flex items-center space-x-4 pointer-events-auto shadow-lg">
+                <div class="flex items-center space-x-1.5">
+                    <i class="fa-solid fa-mouse-pointer text-indigo-400"></i>
+                    <span>Rotar: <strong class="text-white">Click Izq + Arrastro</strong></span>
+                </div>
+                <div class="hidden sm:flex items-center space-x-1.5">
+                    <i class="fa-solid fa-arrows-up-down-left-right text-indigo-400"></i>
+                    <span>Mover: <strong class="text-white">Click Der + Arrastro</strong></span>
+                </div>
+                <div class="flex items-center space-x-1.5">
+                    <i class="fa-solid fa-magnifying-glass-plus text-indigo-400"></i>
+                    <span>Zoom: <strong class="text-white">Rueda / Pinza</strong></span>
+                </div>
+            </div>
+
+            <div class="glass-panel px-3 py-2 rounded-xl text-xs text-gray-400 pointer-events-auto flex items-center space-x-2">
+                <span class="inline-block w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                <span id="fps-counter">60 FPS</span>
+            </div>
+        </footer>
+    </div>
+
+    <!-- Librerías JS necesarias -->
+    <!-- Three.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <!-- OrbitControls -->
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <!-- lil-gui -->
+    <script src="https://cdn.jsdelivr.net/npm/lil-gui@0.18"></script>
+
+    <script>
+        // Variables globales
+        let scene, camera, renderer, controls;
+        let cubeMesh, edgesMesh, innerMesh;
+        let ambientLight, mainLight, fillLight, pointLight;
+        let gui;
+
+        // Configuración y parámetros interactivos
+        const params = {
+            // Cubo principal
+            cubeColor: '#4f46e5',
+            roughness: 0.25,
+            metalness: 0.85,
+            wireframe: false,
+            transparent: false,
+            opacity: 0.9,
+            
+            // Bordes / Edges
+            showEdges: true,
+            edgeColor: '#6366f1',
+            edgeThickness: 1,
+
+            // Animación
+            autoRotate: true,
+            rotSpeedX: 0.008,
+            rotSpeedY: 0.012,
+            rotSpeedZ: 0.005,
+            floatAnimation: true,
+            floatSpeed: 1.5,
+            floatIntensity: 0.2,
+
+            // Luces
+            ambientIntensity: 0.4,
+            lightColor: '#ffffff',
+            pointLightColor: '#818cf8',
+
+            // Fondo
+            bgColor: '#0b0f19'
+        };
+
+        // Medidor simple de FPS
+        let lastTime = performance.now();
+        let frameCount = 0;
+        const fpsElement = document.getElementById('fps-counter');
+
+        window.onload = function() {
+            initThree();
+            createCube();
+            setupLights();
+            setupGUI();
+            animate();
+
+            // Desactivar pantalla de carga si existiera
+            window.addEventListener('resize', onWindowResize, false);
+        };
+
+        function initThree() {
+            const container = document.getElementById('webgl-container');
+
+            // 1. Escena
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(params.bgColor);
+            scene.fog = new THREE.FogExp2(params.bgColor, 0.035);
+
+            // 2. Cámara
+            camera = new THREE.PerspectiveCamera(
+                45, 
+                window.innerWidth / window.innerHeight, 
+                0.1, 
+                1000
+            );
+            camera.position.set(3.5, 3, 5);
+
+            // 3. Renderer
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            renderer.toneMapping = THREE.ACESFilmicToneMapping;
+            renderer.toneMappingExposure = 1.2;
+            container.appendChild(renderer.domElement);
+
+            // 4. Controles (OrbitControls)
+            controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
+            controls.maxDistance = 20;
+            controls.minDistance = 1.5;
+        }
+
+        function createCube() {
+            // Grupo contenedor para rotación y flotación
+            const cubeGroup = new THREE.Group();
+            cubeGroup.name = "cubeGroup";
+
+            // Geometría principal del cubo
+            const geometry = new THREE.BoxGeometry(1.8, 1.8, 1.8, 4, 4, 4);
+
+            // Material estándar con respuesta realista a la luz
+            const material = new THREE.MeshStandardMaterial({
+                color: new THREE.Color(params.cubeColor),
+                roughness: params.roughness,
+                metalness: params.metalness,
+                wireframe: params.wireframe,
+                transparent: params.transparent,
+                opacity: params.opacity,
+                side: THREE.DoubleSide
+            });
+
+            cubeMesh = new THREE.Mesh(geometry, material);
+            cubeMesh.castShadow = true;
+            cubeMesh.receiveShadow = true;
+            cubeGroup.add(cubeMesh);
+
+            // Bordes Resplandecientes (EdgesGeometry)
+            const edgesGeometry = new THREE.EdgesGeometry(geometry);
+            const edgesMaterial = new THREE.LineBasicMaterial({ 
+                color: new THREE.Color(params.edgeColor),
+                linewidth: params.edgeThickness
+            });
+            edgesMesh = new THREE.LineSegments(edgesGeometry, edgesMaterial);
+            cubeGroup.add(edgesMesh);
+
+            // Núcleo brillante interno pequeño
+            const innerGeo = new THREE.BoxGeometry(0.8, 0.8, 0.8);
+            const innerMat = new THREE.MeshBasicMaterial({
+                color: new THREE.Color(params.edgeColor),
+                wireframe: true,
+                transparent: true,
+                opacity: 0.35
+            });
+            innerMesh = new THREE.Mesh(innerGeo, innerMat);
+            cubeGroup.add(innerMesh);
+
+            // Plano del suelo para reflejar sombras proyectadas
+            const shadowPlaneGeo = new THREE.PlaneGeometry(15, 15);
+            const shadowPlaneMat = new THREE.ShadowMaterial({ opacity: 0.35 });
+            const shadowPlane = new THREE.Mesh(shadowPlaneGeo, shadowPlaneMat);
+            shadowPlane.rotation.x = -Math.PI / 2;
+            shadowPlane.position.y = -1.8;
+            shadowPlane.receiveShadow = true;
+            scene.add(shadowPlane);
+
+            // Cuadrícula decorativa suave en el piso
+            const gridHelper = new THREE.GridHelper(15, 30, 0x374151, 0x1f2937);
+            gridHelper.position.y = -1.81;
+            scene.add(gridHelper);
+
+            scene.add(cubeGroup);
+        }
+
+        function setupLights() {
+            // Luz ambiental
+            ambientLight = new THREE.AmbientLight(0xffffff, params.ambientIntensity);
+            scene.add(ambientLight);
+
+            // Luz direccional principal con sombra
+            mainLight = new THREE.DirectionalLight(params.lightColor, 1.8);
+            mainLight.position.set(5, 6, 4);
+            mainLight.castShadow = true;
+            mainLight.shadow.mapSize.width = 1024;
+            mainLight.shadow.mapSize.height = 1024;
+            mainLight.shadow.camera.near = 0.5;
+            mainLight.shadow.camera.far = 15;
+            mainLight.shadow.bias = -0.001;
+            scene.add(mainLight);
+
+            // Luz de relleno (Fill Light) posterior suave
+            fillLight = new THREE.DirectionalLight(0x6366f1, 0.8);
+            fillLight.position.set(-5, -2, -4);
+            scene.add(fillLight);
+
+            // Luz puntual dinámica dentro del cubo para emitir destello interno
+            pointLight = new THREE.PointLight(params.pointLightColor, 2, 6);
+            pointLight.position.set(0, 0, 0);
+            scene.add(pointLight);
+        }
+
+        function setupGUI() {
+            gui = new lil.GUI({ title: 'Panel de Control 3D' });
+
+            // Carpeta: Material
+            const folderMaterial = gui.addFolder('Material del Cubo');
+            folderMaterial.addColor(params, 'cubeColor').name('Color Cubo').onChange(val => {
+                cubeMesh.material.color.set(val);
+            });
+            folderMaterial.add(params, 'roughness', 0, 1, 0.01).name('Rugosidad').onChange(val => {
+                cubeMesh.material.roughness = val;
+            });
+            folderMaterial.add(params, 'metalness', 0, 1, 0.01).name('Metalicidad').onChange(val => {
+                cubeMesh.material.metalness = val;
+            });
+            folderMaterial.add(params, 'wireframe').name('Modo Wireframe').onChange(val => {
+                cubeMesh.material.wireframe = val;
+            });
+            folderMaterial.add(params, 'transparent').name('Transparencia').onChange(val => {
+                cubeMesh.material.transparent = val;
+                cubeMesh.material.needsUpdate = true;
+            });
+            folderMaterial.add(params, 'opacity', 0.1, 1, 0.05).name('Opacidad').onChange(val => {
+                cubeMesh.material.opacity = val;
+            });
+
+            // Carpeta: Bordes
+            const folderEdges = gui.addFolder('Bordes & Núcleo');
+            folderEdges.add(params, 'showEdges').name('Mostrar Bordes').onChange(val => {
+                edgesMesh.visible = val;
+            });
+            folderEdges.addColor(params, 'edgeColor').name('Color Bordes').onChange(val => {
+                edgesMesh.material.color.set(val);
+                innerMesh.material.color.set(val);
+                pointLight.color.set(val);
+            });
+
+            // Carpeta: Animación & Movimiento
+            const folderAnim = gui.addFolder('Animación');
+            folderAnim.add(params, 'autoRotate').name('Rotación Automática');
+            folderAnim.add(params, 'rotSpeedX', -0.05, 0.05, 0.001).name('Velocidad X');
+            folderAnim.add(params, 'rotSpeedY', -0.05, 0.05, 0.001).name('Velocidad Y');
+            folderAnim.add(params, 'rotSpeedZ', -0.05, 0.05, 0.001).name('Velocidad Z');
+            folderAnim.add(params, 'floatAnimation').name('Efecto Flotante');
+            folderAnim.add(params, 'floatSpeed', 0.2, 5, 0.1).name('Vel. Flotación');
+
+            // Carpeta: Entorno & Iluminación
+            const folderEnv = gui.addFolder('Iluminación & Fondo');
+            folderEnv.add(params, 'ambientIntensity', 0, 2, 0.05).name('Luz Ambiental').onChange(val => {
+                ambientLight.intensity = val;
+            });
+            folderEnv.addColor(params, 'bgColor').name('Fondo').onChange(val => {
+                scene.background.set(val);
+                scene.fog.color.set(val);
+            });
+
+            // Abrir por defecto en escritorio
+            if (window.innerWidth > 768) {
+                gui.open();
+            } else {
+                gui.close();
+            }
+        }
+
+        // Función de animación (Render Loop)
+        function animate() {
+            requestAnimationFrame(animate);
+
+            const time = clock.getElapsedTime();
+
+            const cubeGroup = scene.getObjectByName("cubeGroup");
+
+            if (cubeGroup) {
+                // Rotación suave multiaxial
+                if (params.autoRotate) {
+                    cubeGroup.rotation.x += params.rotSpeedX;
+                    cubeGroup.rotation.y += params.rotSpeedY;
+                    cubeGroup.rotation.z += params.rotSpeedZ;
+                }
+
+                // Rotación contraria sutil para el cubo interno
+                if (innerMesh) {
+                    innerMesh.rotation.x -= params.rotSpeedX * 1.5;
+                    innerMesh.rotation.y += params.rotSpeedY * 1.5;
+                }
+
+                // Efecto de flotación armónica en el eje Y (Seno)
+                if (params.floatAnimation) {
+                    cubeGroup.position.y = Math.sin(time * params.floatSpeed) * params.floatIntensity;
+                } else {
+                    cubeGroup.position.y = 0;
+                }
+            }
+
+            // Actualizar controles
+            controls.update();
+
+            // Medir FPS
+            updateFPS();
+
+            // Renderizar escena
+            renderer.render(scene, camera);
+        }
+
+        const clock = new THREE.Clock();
+
+        function updateFPS() {
+            frameCount++;
+            const currentTime = performance.now();
+            if (currentTime >= lastTime + 1000) {
+                const fps = Math.round((frameCount * 1000) / (currentTime - lastTime));
+                fpsElement.textContent = `${fps} FPS`;
+                frameCount = 0;
+                lastTime = currentTime;
+            }
+        }
+
+        // Ajuste responsive de ventana
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        // Presets rápidos para la interfaz
+        function applyPreset(name) {
+            switch(name) {
+                case 'cyberpunk':
+                    params.cubeColor = '#ec4899';
+                    params.edgeColor = '#06b6d4';
+                    params.bgColor = '#090514';
+                    params.roughness = 0.15;
+                    params.metalness = 0.9;
+                    break;
+                case 'emerald':
+                    params.cubeColor = '#059669';
+                    params.edgeColor = '#34d399';
+                    params.bgColor = '#022c22';
+                    params.roughness = 0.3;
+                    params.metalness = 0.7;
+                    break;
+                case 'gold':
+                    params.cubeColor = '#d97706';
+                    params.edgeColor = '#fef08a';
+                    params.bgColor = '#1c1917';
+                    params.roughness = 0.2;
+                    params.metalness = 0.95;
+                    break;
+                default: // Neón Azul
+                    params.cubeColor = '#4f46e5';
+                    params.edgeColor = '#6366f1';
+                    params.bgColor = '#0b0f19';
+                    params.roughness = 0.25;
+                    params.metalness = 0.85;
+                    break;
+            }
+
+            // Aplicar a los materiales y elementos
+            cubeMesh.material.color.set(params.cubeColor);
+            cubeMesh.material.roughness = params.roughness;
+            cubeMesh.material.metalness = params.metalness;
+            edgesMesh.material.color.set(params.edgeColor);
+            innerMesh.material.color.set(params.edgeColor);
+            pointLight.color.set(params.edgeColor);
+            scene.background.set(params.bgColor);
+            scene.fog.color.set(params.bgColor);
+
+            // Actualizar interfaz GUI
+            gui.controllers.forEach(c => c.updateDisplay());
+            gui.folders.forEach(f => f.controllers.forEach(c => c.updateDisplay()));
+        }
+    </script>
+</body>
+</html>
